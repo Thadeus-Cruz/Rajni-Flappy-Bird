@@ -10,30 +10,30 @@ const VOICE_CONFIG = {
 };
 
 const VOICE_GAME_CONFIG = {
-    birdStartX: 100,
-    birdStartY: 300,
-    birdSize: 30,
-    gravity: 0.05,
-    flapStrength: -2,
-    pipeWidth: 60,
-    pipeGap: 150,
-    pipeSpeed: 1.5,
-    tapCooldown: 200,
-    gameWidth: 800,
-    gameHeight: 600
+    birdStartX: 100, //DO NOT CHANGE
+    birdStartY: 300, //DO NOT CHANGE
+    birdSize: 30, //DO NOT CHANGE
+    gravity: 0.05, //speed of drop for the bird
+    flapStrength: -2, // Jump sensitivity (0 - -10)
+    pipeWidth: 60, //change pipe width (size of the green pipe)
+    pipeGap: 150, //height diff b/w pipe
+    pipeSpeed: 1.5, // speed of the game
+    tapCooldown: 200, // cool down time to eliminate multitouch
+    gameWidth: 1200, // game viewing width
+    gameHeight: 600 //DO NOT CHANGE
 };
 
 const KEYBOARD_GAME_CONFIG = {
     birdStartX: 100,
     birdStartY: 300,
     birdSize: 30,
-    gravity: 0.1,  // Easier gravity
-    flapStrength: -5,  // Stronger flap
-    pipeWidth: 60,
-    pipeGap: 200,  // Bigger gap
-    pipeSpeed: 1.5,  // Slower pipes
+    gravity: 0.15, 
+    flapStrength: -5, 
+    pipeWidth: 60, 
+    pipeGap: 200, 
+    pipeSpeed: 3,
     tapCooldown: 200,
-    gameWidth: 800,
+    gameWidth: 1200,
     gameHeight: 600
 };
 
