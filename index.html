@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird - Voice or Keyboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="screen active">
+            <div class="welcome-content">
+                <h1 class="game-title">Flappy Bird</h1>
+                <p class="game-description">Choose your control style and start playing!</p>
+                
+                <div class="form-group">
+                    <label for="player-name" class="form-label">Enter Your Name:</label>
+                    <input type="text" id="player-name" class="form-control" placeholder="Your name here..." maxlength="20">
+                </div>
+                
+                <div class="button-group">
+                    <button id="start-game-btn" class="btn btn--primary btn--lg">Start Game 🚀</button>
+                    <button id="view-leaderboard-btn" class="btn btn--secondary btn--lg">Leaderboard 🏆</button>
+                </div>
+                
+                <div class="instructions">
+                    <h3>How to Play:</h3>
+                    <div id="voice-instructions" class="voice-element">
+                        <ul>
+                            <li>🎙️ Allow microphone access when prompted</li>
+                            <li>🗣️ Say: "flap", "up", "jump", "go", "fly"</li>
+                            <li>👏 Or make ANY sound (clap, whistle, etc.)</li>
+                            <li>✨ Navigate through the pipes</li>
+                        </ul>
+                    </div>
+                    <div id="keyboard-instructions" style="display: none;">
+                        <ul>
+                            <li>⌨️ Use SPACE, UP ARROW, or W key to flap</li>
+                            <li>✨ Navigate through the pipes</li>
+                            <li>⏸️ Press P to pause the game</li>
+                        </ul>
+                    </div>
+                    <ul>
+                        <li>🎯 Get the highest score possible!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Calibration Screen -->
+        <div id="calibration-screen" class="screen">
+            <div class="calibration-content">
+                <h2>🎤 Control Setup</h2>
+                <p class="calibration-instructions">Configure your preferred control method</p>
+                
+                <div class="calibration-controls">
+                    <!-- Control Mode Toggle -->
+                    <div class="control-mode">
+                    <label class="form-label">Control Mode:</label>
+                    <div class="toggle-container">
+                        <span class="toggle-label-left">🎤 Voice</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="control-mode-toggle" checked>
+                            <label for="control-mode-toggle" class="toggle-label">
+                                <span class="toggle-handle"></span>
+                            </label>
+                        </div>
+                        <span class="toggle-label-right">⌨️ Keyboard</span>
+                    </div>
+                    </div>
+                    
+                    <!-- Voice-specific elements -->
+                    <div id="voice-controls" class="voice-element">
+                        <div class="voice-meter-container">
+                            <label class="form-label">Voice Activity Monitor</label>
+                            <div class="voice-meter">
+                                <div id="voice-level-bar" class="voice-level-bar"></div>
+                                <div class="voice-threshold-line"></div>
+                            </div>
+                            <div class="voice-meter-labels">
+                                <span>Silent</span>
+                                <span>Loud</span>
+                            </div>
+                        </div>
+                        
+                        <div class="sensitivity-control">
+                            <label for="sensitivity-slider" class="form-label">Sensitivity</label>
+                            <input type="range" id="sensitivity-slider" class="sensitivity-slider" 
+                                   min="0.1" max="0.8" step="0.1" value="0.3">
+                            <div class="sensitivity-labels">
+                                <span>Low</span>
+                                <span>High</span>
+                            </div>
+                        </div>
+                        
+                        <div class="test-area">
+                            <button id="test-voice-btn" class="btn btn--secondary">Test Voice Commands</button>
+                            <div id="voice-test-feedback" class="voice-test-feedback"></div>
+                            <div id="detection-count" class="detection-count">Commands Detected: <span>0</span></div>
+                        </div>
+                        
+                        <div class="voice-commands">
+                            <h4>Supported Commands:</h4>
+                            <div class="command-badges">
+                                <span class="command-badge">"flap"</span>
+                                <span class="command-badge">"up"</span>
+                                <span class="command-badge">"jump"</span>
+                                <span class="command-badge">"go"</span>
+                                <span class="command-badge">"fly"</span>
+                                <span class="command-badge">Any Sound</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Keyboard instructions -->
+                    <div id="keyboard-controls" style="display: none;">
+                        <div class="keyboard-instructions">
+                            <h4>Keyboard Controls:</h4>
+                            <div class="command-badges">
+                                <span class="command-badge">SPACE</span>
+                                <span class="command-badge">UP ARROW</span>
+                                <span class="command-badge">W</span>
+                                <span class="command-badge">ENTER</span>
+                                <span class="command-badge">F</span>
+                            </div>
+                            <p>Use any of these keys to make the bird flap.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="continue-game-btn" class="btn btn--primary btn--lg">Continue to Game 🎮</button>
+                    <button id="back-to-welcome-btn" class="btn btn--outline">Back</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Countdown Screen -->
+        <div id="countdown-screen" class="screen">
+            <div class="countdown-content">
+                <h2>Get Ready!</h2>
+                <div id="countdown-number" class="countdown-number">3</div>
+                <p id="countdown-instruction" class="countdown-instructions">Make any sound to control the bird!</p>
+                
+                <div id="countdown-voice-status" class="countdown-voice-status voice-element">
+                    <div class="mini-voice-meter">
+                        <div id="countdown-voice-bar" class="mini-voice-bar"></div>
+                    </div>
+                    <span id="countdown-voice-text">Listening...</span>
+                </div>
+                
+                <div id="countdown-keyboard-hint" style="display: none;">
+                    <p>Press SPACE to start flying!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="game-header">
+                <div class="score-display">
+                    <span class="score-label">Score:</span>
+                    <span id="current-score" class="score-value">0</span>
+                </div>
+                <div id="control-mode-indicator" class="control-mode-indicator">
+                    🎤 Voice Mode
+                </div>
+                <div id="voice-status" class="voice-status voice-element">
+                    <div id="mic-indicator" class="mic-indicator">
+                        <span class="mic-icon">🎤</span>
+                        <div class="voice-activity-bar">
+                            <div id="game-voice-bar" class="game-voice-bar"></div>
+                        </div>
+                        <span id="mic-status" class="mic-status-text">Listening...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-container">
+                <canvas id="game-canvas" width="800" height="600"></canvas>
+                <div id="voice-feedback" class="voice-feedback voice-element"></div>
+                <div id="command-counter" class="command-counter">Commands: <span id="command-count">0</span></div>
+            </div>
+            
+            <div class="game-controls">
+                <button id="pause-btn" class="btn btn--outline btn--sm">Pause ⏸️</button>
+                <div id="live-sensitivity" class="live-sensitivity voice-element">
+                    <span>Sensitivity:</span>
+                    <input type="range" id="game-sensitivity" class="mini-slider" 
+                           min="0.1" max="0.8" step="0.1" value="0.3">
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="screen">
+            <div class="game-over-content">
+                <h2>Game Over!</h2>
+                <div class="final-score">
+                    <p>Final Score:</p>
+                    <div id="final-score-value" class="score-big">0</div>
+                </div>
+
+                <div id="game-stats" class="game-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Commands:</span>
+                        <span id="final-commands" class="stat-value">0</span>
+                    </div>
+                    <div id="detection-rate-container" class="stat-item voice-element">
+                        <span class="stat-label">Detection Rate:</span>
+                        <span id="detection-rate" class="stat-value">100%</span>
+                    </div>
+                </div>
+
+                <div id="new-record" class="new-record hidden">
+                    <div class="status status--success">🎉 New High Score!</div>
+                </div>
+
+                <div id="current-rank" class="current-rank">
+                    <p>Your Rank: <span id="rank-value">#-</span></p>
+                </div>
+
+                <div class="button-group">
+                    <button id="try-again-btn" class="btn btn--primary btn--lg">Play Again 🔄</button>
+                    <button id="new-player-btn" class="btn btn--secondary btn--lg">New Player 👤</button>
+                    <button id="view-scores-btn" class="btn btn--outline">Leaderboard 📊</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboard-screen" class="screen">
+            <div class="leaderboard-content">
+                <h2>🏆 Leaderboard</h2>
+                <div class="leaderboard-table">
+                    <div class="leaderboard-header">
+                        <div class="rank-col">Rank</div>
+                        <div class="name-col">Player</div>
+                        <div class="score-col">Score</div>
+                        <div class="commands-col">Commands</div>
+                    </div>
+                    <div id="leaderboard-list" class="leaderboard-list">
+                        <!-- Scores will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="play-again-btn" class="btn btn--primary btn--lg">Play Again 🎮</button>
+                    <button id="back-to-menu-btn" class="btn btn--outline">Back to Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Microphone Permission Modal -->
+        <div id="mic-permission-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>🎤 Microphone Access Required</h3>
+                <p>Voice mode requires microphone access to detect your commands.</p>
+                
+                <div class="permission-features">
+                    <div class="feature-item">✅ Speech recognition for voice commands</div>
+                    <div class="feature-item">✅ Audio level detection for any sound</div>
+                    <div class="feature-item">✅ Real-time voice activity monitoring</div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="request-mic-btn" class="btn btn--primary">Allow Microphone</button>
+                    <button id="cancel-mic-btn" class="btn btn--outline">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Troubleshooting Modal -->
+        <div id="troubleshoot-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>🔧 Troubleshooting</h3>
+                <div class="troubleshoot-content">
+                    <div id="voice-troubleshoot" class="voice-element">
+                        <h4>If voice commands aren't working:</h4>
+                        <ul>
+                            <li>Check microphone connection and permissions</li>
+                            <li>Increase sensitivity using the slider</li>
+                            <li>Speak clearly or try other sounds</li>
+                        </ul>
+                    </div>
+                    <h4>Browser Compatibility:</h4>
+                    <p>Works best in Chrome, Edge, or Safari. Firefox has limited support.</p>
+                </div>
+                
+                <div class="button-group">
+                    <button id="close-troubleshoot-btn" class="btn btn--primary">Got It</button>
+                    <button id="test-again-btn" class="btn btn--secondary">Test Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
