@@ -1917,3 +1917,50 @@ input:checked + .toggle-label .toggle-handle {
     justify-content: flex-end;
   }
 }
+
+/* NEW: Splash Screen Styles */
+#splash-screen {
+    flex-direction: column;
+    background: var(--color-background);
+    cursor: pointer;
+}
+
+.splash-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-16);
+}
+
+.splash-icon {
+    width: 120px;
+    height: 120px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+
+.splash-title {
+    font-size: 48px;
+    color: var(--color-primary);
+    font-weight: var(--font-weight-bold);
+}
+
+.splash-creator {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+    margin: 0;
+}
+
+.tap-to-start {
+    font-size: var(--font-size-xl);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--space-24);
+    animation: blink 1.5s infinite ease-in-out;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

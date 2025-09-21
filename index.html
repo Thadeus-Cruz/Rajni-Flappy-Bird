@@ -2,14 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flappy Bird - Voice or Keyboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Flappy Bird - Voice or Keyboard/Mobile</title>
+    <link rel="icon" type="image/png" href="flappy-bird.png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <!-- Welcome Screen -->
-        <div id="welcome-screen" class="screen active">
+        <div id="splash-screen" class="screen active">
+            <div class="splash-content">
+                <img src="./Icon.png" alt="Game Icon" class="splash-icon">
+                <h1 class="splash-title">Rajini Theme Flappy Bird</h1>
+                <p class="splash-creator">Created by Thadeus Cruz Govindapillai</p>
+                <p class="tap-to-start">Tap anywhere to enter</p>
+            </div>
+        </div>
+
+        <div id="welcome-screen" class="screen">
             <div class="welcome-content">
                 <h1 class="game-title">Flappy Bird</h1>
                 <p class="game-description">Choose your control style and start playing!</p>
@@ -36,7 +45,8 @@
                     </div>
                     <div id="keyboard-instructions" style="display: none;">
                         <ul>
-                            <li>⌨️ Use SPACE, UP ARROW, or W key to flap</li>
+                            <li>📱 Tap the screen to flap</li>
+                            <li>⌨️ Or use SPACE, UP ARROW, or W key to flap</li>
                             <li>✨ Navigate through the pipes</li>
                             <li>⏸️ Press P to pause the game</li>
                         </ul>
@@ -48,29 +58,26 @@
             </div>
         </div>
 
-        <!-- Voice Calibration Screen -->
         <div id="calibration-screen" class="screen">
             <div class="calibration-content">
                 <h2>🎤 Control Setup</h2>
                 <p class="calibration-instructions">Configure your preferred control method</p>
                 
                 <div class="calibration-controls">
-                    <!-- Control Mode Toggle -->
                     <div class="control-mode">
                     <label class="form-label">Control Mode:</label>
                     <div class="toggle-container">
                         <span class="toggle-label-left">🎤 Voice</span>
                         <div class="toggle-switch">
-                            <input type="checkbox" id="control-mode-toggle" checked>
+                            <input type="checkbox" id="control-mode-toggle">
                             <label for="control-mode-toggle" class="toggle-label">
                                 <span class="toggle-handle"></span>
                             </label>
                         </div>
-                        <span class="toggle-label-right">⌨️ Keyboard</span>
+                        <span class="toggle-label-right">⌨️ Keyboard/Mobile</span>
                     </div>
                     </div>
                     
-                    <!-- Voice-specific elements -->
                     <div id="voice-controls" class="voice-element">
                         <div class="voice-meter-container">
                             <label class="form-label">Voice Activity Monitor</label>
@@ -113,18 +120,16 @@
                         </div>
                     </div>
                     
-                    <!-- Keyboard instructions -->
                     <div id="keyboard-controls" style="display: none;">
                         <div class="keyboard-instructions">
-                            <h4>Keyboard Controls:</h4>
-                            <div class="command-badges">
+                            <h4>Keyboard/Mobile Controls:</h4>
+                             <div class="command-badges">
+                                <span class="command-badge">TAP SCREEN</span>
                                 <span class="command-badge">SPACE</span>
                                 <span class="command-badge">UP ARROW</span>
                                 <span class="command-badge">W</span>
-                                <span class="command-badge">ENTER</span>
-                                <span class="command-badge">F</span>
                             </div>
-                            <p>Use any of these keys to make the bird flap.</p>
+                            <p>Use any of these controls to make the bird flap.</p>
                         </div>
                     </div>
                 </div>
@@ -136,7 +141,6 @@
             </div>
         </div>
 
-        <!-- Countdown Screen -->
         <div id="countdown-screen" class="screen">
             <div class="countdown-content">
                 <h2>Get Ready!</h2>
@@ -151,12 +155,11 @@
                 </div>
                 
                 <div id="countdown-keyboard-hint" style="display: none;">
-                    <p>Press SPACE to start flying!</p>
+                    <p>Tap the screen or press SPACE to start flying!</p>
                 </div>
             </div>
         </div>
 
-        <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-header">
                 <div class="score-display">
@@ -193,7 +196,6 @@
             </div>
         </div>
 
-        <!-- Game Over Screen -->
         <div id="game-over-screen" class="screen">
             <div class="game-over-content">
                 <h2>Game Over!</h2>
@@ -229,7 +231,6 @@
             </div>
         </div>
 
-        <!-- Leaderboard Screen -->
         <div id="leaderboard-screen" class="screen">
             <div class="leaderboard-content">
                 <h2>🏆 Leaderboard</h2>
@@ -239,10 +240,10 @@
                         <div class="name-col">Player</div>
                         <div class="score-col">Score</div>
                         <div class="commands-col">Commands</div>
+                        <div class="date-col">Date</div>
                     </div>
                     <div id="leaderboard-list" class="leaderboard-list">
-                        <!-- Scores will be populated here -->
-                    </div>
+                        </div>
                 </div>
                 
                 <div class="button-group">
@@ -252,7 +253,6 @@
             </div>
         </div>
 
-        <!-- Microphone Permission Modal -->
         <div id="mic-permission-modal" class="modal hidden">
             <div class="modal-content">
                 <h3>🎤 Microphone Access Required</h3>
@@ -271,7 +271,6 @@
             </div>
         </div>
 
-        <!-- Troubleshooting Modal -->
         <div id="troubleshoot-modal" class="modal hidden">
             <div class="modal-content">
                 <h3>🔧 Troubleshooting</h3>
@@ -295,6 +294,14 @@
             </div>
         </div>
     </div>
+
+    <audio id="audio-home" src="./home.ogg" loop></audio>
+    <audio id="audio-name" src="./name.ogg"></audio>
+    <audio id="audio-score" src="./score.ogg"></audio>
+    <audio id="audio-bgm" src="./bgm.ogg" loop></audio>
+    <audio id="audio-lose" src="./lose.ogg"></audio>
+    <audio id="audio-gameover" src="./gameover.ogg"></audio>
+    <audio id="audio-countdown" src="./countdown.ogg"></audio>
 
     <script src="app.js"></script>
 </body>

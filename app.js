@@ -27,23 +27,23 @@ const KEYBOARD_GAME_CONFIG = {
     birdStartX: 100,
     birdStartY: 300,
     birdSize: 30,
-    gravity: 0.15, 
-    flapStrength: -5, 
+    gravity: 0.2, 
+    flapStrength: -7, 
     pipeWidth: 60, 
     pipeGap: 200, 
-    pipeSpeed: 3,
+    pipeSpeed: 4,
     tapCooldown: 200,
     gameWidth: 1200,
     gameHeight: 600
 };
 
-let GAME_CONFIG = {...VOICE_GAME_CONFIG}; // Default to voice config
+let GAME_CONFIG = {}; // Will be set based on mode
 
 const VOICE_COMMANDS = ["flap", "up", "jump", "go", "fly"];
 
 // Game State
 let gameState = {
-    currentScreen: 'welcome',
+    currentScreen: 'splash', // Start on splash screen
     playerName: '',
     score: 0,
     commandCount: 0,
@@ -54,6 +54,180 @@ let gameState = {
     testDetectionCount: 0,
     waitingForFirstInput: false
 };
+
+// Audio Manager
+const AudioManager = {
+    sounds: {},
+    volumes: {
+        home: 0.3,
+        name: 1.0,
+        score: 1.0,
+        bgm: 0.25,
+        lose: 1.0,
+        gameover: 0.6,
+        countdown: 0.8
+    },
+    isMuted: false,
+    userInteracted: false,
+    isTabActive: true, 
+    pausedForVisibility: [], 
+
+    init() {
+        this.sounds.home = document.getElementById('audio-home');
+        this.sounds.name = document.getElementById('audio-name');
+        this.sounds.score = document.getElementById('audio-score');
+        this.sounds.bgm = document.getElementById('audio-bgm');
+        this.sounds.lose = document.getElementById('audio-lose');
+        this.sounds.gameover = document.getElementById('audio-gameover');
+        this.sounds.countdown = document.getElementById('audio-countdown'); 
+
+        Object.entries(this.sounds).forEach(([name, sound]) => {
+            if (sound && this.volumes[name] !== undefined) {
+                sound.volume = this.volumes[name];
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
+    },
+
+    handleVisibilityChange() {
+        if (document.hidden) {
+            this.isTabActive = false;
+            this.pausedForVisibility = [];
+            Object.entries(this.sounds).forEach(([name, sound]) => {
+                if (sound && !sound.paused) {
+                    this.fadeOut(sound);
+                    this.pausedForVisibility.push(name);
+                }
+            });
+        } else {
+            this.isTabActive = true;
+            this.pausedForVisibility.forEach(name => {
+                if (this.sounds[name]) {
+                    this.fadeIn(this.sounds[name]);
+                }
+            });
+            this.pausedForVisibility = [];
+        }
+    },
+
+    fadeOut(sound, duration = 300) {
+        if (!sound) return;
+        let currentVolume = sound.volume;
+        if (sound.fadeInterval) clearInterval(sound.fadeInterval);
+        const step = currentVolume / (duration / 20); 
+
+        sound.fadeInterval = setInterval(() => {
+            currentVolume -= step;
+            if (currentVolume <= 0) {
+                sound.volume = 0;
+                sound.pause();
+                clearInterval(sound.fadeInterval);
+            } else {
+                sound.volume = currentVolume;
+            }
+        }, 20);
+    },
+
+    fadeIn(sound, duration = 300) {
+        if (!sound || !this.isTabActive || (this.isMuted && sound.loop)) return;
+        if (sound.fadeInterval) clearInterval(sound.fadeInterval);
+
+        // Find the sound's name to get its target volume
+        const soundName = Object.keys(this.sounds).find(key => this.sounds[key] === sound);
+        const targetVolume = this.volumes[soundName] || 1;
+
+        sound.play().catch(() => {}); 
+        let currentVolume = sound.volume;
+        // Adjust the step based on the target volume
+        const step = targetVolume / (duration / 20); 
+
+        sound.fadeInterval = setInterval(() => {
+            currentVolume += step;
+            if (currentVolume >= targetVolume) { // Check against target volume
+                sound.volume = targetVolume;
+                clearInterval(sound.fadeInterval);
+            } else {
+                sound.volume = currentVolume;
+            }
+        }, 20);
+    },
+
+    isPlaying(soundName) {
+        const sound = this.sounds[soundName];
+        return sound && !sound.paused && sound.currentTime > 0;
+    },
+
+    play(soundName, onEnded = null) {
+        if (!this.userInteracted || this.isMuted) return;
+        
+        const sound = this.sounds[soundName];
+        if (sound) {
+            
+            if (sound.loop && !sound.paused) {
+                 if (onEnded) {
+                     sound.onended = () => {
+                         sound.onended = null;
+                         onEnded();
+                     };
+                 } else {
+                     sound.onended = null;
+                 }
+                 return; 
+            }
+
+            if (sound.fadeInterval) clearInterval(sound.fadeInterval);
+            // REPLACE 'sound.volume = 1;' with this line:
+            sound.volume = this.volumes[soundName] || 1; // Use custom volume
+
+            sound.currentTime = 0;
+            
+            if (this.isTabActive) {
+                sound.play().catch(e => {
+                    if (e.name !== 'AbortError') {
+                        console.error(`Audio play failed for ${soundName}:`, e);
+                    }
+                });
+            }
+            
+            if (onEnded) {
+                sound.onended = () => {
+                    sound.onended = null;
+                    onEnded();
+                };
+            } else {
+                sound.onended = null;
+            }
+        }
+    },
+
+    stopMusic() {
+        // REWRITE THIS FUNCTION to get the sound names
+        const music = {home: this.sounds.home, bgm: this.sounds.bgm};
+        Object.entries(music).forEach(([name, sound]) => {
+            if (sound) {
+                if (sound.fadeInterval) clearInterval(sound.fadeInterval);
+                sound.pause();
+                sound.currentTime = 0;
+                sound.volume = this.volumes[name] || 1; // Reset to custom volume
+            }
+        });
+    },
+
+    stopAll() {
+        // REWRITE THIS FUNCTION to get the sound names
+        Object.entries(this.sounds).forEach(([name, sound]) => {
+            if (sound) {
+                if (sound.fadeInterval) clearInterval(sound.fadeInterval);
+                sound.pause();
+                sound.currentTime = 0;
+                sound.onended = null;
+                sound.volume = this.volumes[name] || 1; // Reset to custom volume
+            }
+        });
+    }
+};
+
 
 // Enhanced Voice Recognition System
 let recognition = null;
@@ -66,7 +240,6 @@ let isAudioInitialized = false;
 let amplitudeDetectionActive = false;
 let lastCommandTime = 0;
 let voiceAnimationFrame = null;
-let isAboveThreshold = false;
 
 // Game Objects
 let bird = null;
@@ -74,28 +247,25 @@ let pipes = [];
 let canvas = null;
 let ctx = null;
 let animationFrame = null;
+let birdImg = null;
 
 // DOM Elements
 let screens = {};
 
 // Initialize the game when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing enhanced voice-controlled game...');
-    
-    // Small delay to ensure all elements are rendered
     setTimeout(() => {
         initializeDOMElements();
         initializeGame();
         setupEventListeners();
         setupEnhancedVoiceRecognition();
-        console.log('Game initialization complete');
+        AudioManager.init();
     }, 100);
 });
 
 function initializeDOMElements() {
-    console.log('Initializing DOM elements...');
-    
     screens = {
+        splash: document.getElementById('splash-screen'), 
         welcome: document.getElementById('welcome-screen'),
         calibration: document.getElementById('calibration-screen'),
         countdown: document.getElementById('countdown-screen'),
@@ -103,32 +273,17 @@ function initializeDOMElements() {
         gameOver: document.getElementById('game-over-screen'),
         leaderboard: document.getElementById('leaderboard-screen')
     };
-    
-    // Verify all screens were found
-    for (const [key, element] of Object.entries(screens)) {
-        if (!element) {
-            console.error(`Screen element not found: ${key}-screen`);
-        } else {
-            console.log(`Found screen: ${key}`);
-        }
-    }
 }
 
 function setupControlModeToggle() {
     const toggle = document.getElementById('control-mode-toggle');
     if (toggle) {
-        // Load saved preference or use default
-        const savedMode = localStorage.getItem('flappyBirdControlMode');
-        GAME_CONFIG.controlMode = savedMode || 'voice';
-        // Set the initial config based on mode
-        updateGameConfigForMode(GAME_CONFIG.controlMode);
-        // Reverse the initial checked state to match the correct mode
-        toggle.checked = GAME_CONFIG.controlMode === 'keyboard';
+        const savedMode = localStorage.getItem('flappyBirdControlMode') || 'keyboard'; 
+        toggle.checked = savedMode === 'keyboard';
+        updateGameConfigForMode(savedMode);
         
         toggle.addEventListener('change', function() {
-            // Reverse the logic here
             const newMode = this.checked ? 'keyboard' : 'voice';
-            GAME_CONFIG.controlMode = newMode;
             updateGameConfigForMode(newMode);
             localStorage.setItem('flappyBirdControlMode', newMode);
             updateControlModeUI();
@@ -137,532 +292,280 @@ function setupControlModeToggle() {
 }
 
 function updateGameConfigForMode(mode) {
-    if (mode === 'voice') {
-        Object.assign(GAME_CONFIG, VOICE_GAME_CONFIG);
+     if (mode === 'voice') {
+        GAME_CONFIG = {...VOICE_GAME_CONFIG};
     } else {
-        Object.assign(GAME_CONFIG, KEYBOARD_GAME_CONFIG);
+        GAME_CONFIG = {...KEYBOARD_GAME_CONFIG};
     }
+    GAME_CONFIG.controlMode = mode;
 }
 
 function updateControlModeUI() {
     const modeIndicator = document.getElementById('control-mode-indicator');
     if (modeIndicator) {
-        modeIndicator.textContent = GAME_CONFIG.controlMode === 'voice' ? '🎤 Voice Mode' : '⌨️ Keyboard Mode';
+        modeIndicator.textContent = GAME_CONFIG.controlMode === 'voice' ? '🎤 Voice Mode' : '⌨️ Keyboard/Mobile Mode';
     }
+    document.querySelectorAll('.voice-element').forEach(el => el.style.display = GAME_CONFIG.controlMode === 'voice' ? '' : 'none');
+    document.querySelectorAll('#keyboard-instructions, #keyboard-controls, #countdown-keyboard-hint').forEach(el => el.style.display = GAME_CONFIG.controlMode === 'keyboard' ? '' : 'none');
     
-    // Show/hide voice-specific UI elements
-    const voiceElements = document.querySelectorAll('.voice-element');
-    voiceElements.forEach(el => {
-        el.style.display = GAME_CONFIG.controlMode === 'voice' ? '' : 'none';
-    });
-    
-    // Show/hide keyboard instructions
-    const keyboardElements = document.querySelectorAll('#keyboard-instructions, #keyboard-controls, #countdown-keyboard-hint');
-    keyboardElements.forEach(el => {
-        el.style.display = GAME_CONFIG.controlMode === 'keyboard' ? '' : 'none';
-    });
-    
-    // Update countdown instruction text
     const countdownInstruction = document.getElementById('countdown-instruction');
     if (countdownInstruction) {
         countdownInstruction.textContent = GAME_CONFIG.controlMode === 'voice' 
             ? 'Make any sound to control the bird!' 
-            : 'Press SPACE to start flying!';
+            : 'Tap screen or press SPACE to start!';
     }
 }
 
 function initializeGame() {
     setupControlModeToggle();
-    console.log('Initializing game...');
+    updateControlModeUI();
     
     canvas = document.getElementById('game-canvas');
-    if (canvas) {
-        ctx = canvas.getContext('2d');
-        canvas.width = GAME_CONFIG.gameWidth;
-        canvas.height = GAME_CONFIG.gameHeight;
-        canvas.style.display = 'block';
-        canvas.style.margin = '0 auto';
-        console.log('Canvas initialized');
-    } else {
-        console.error('Canvas not found');
-    }
+    ctx = canvas.getContext('2d');
+    canvas.width = GAME_CONFIG.gameWidth;
+    canvas.height = GAME_CONFIG.gameHeight;
+    
+    birdImg = new Image();
+    birdImg.src = './flappy-bird.png'; 
     
     resetBird();
     loadHighScores();
-    showScreen('welcome');
-    console.log('Game initialization complete');
+    showScreen('splash'); 
 }
 
 function setupEventListeners() {
-    console.log('Setting up event listeners...');
-    
-    // Welcome screen
-    const startGameBtn = document.getElementById('start-game-btn');
-    const viewLeaderboardBtn = document.getElementById('view-leaderboard-btn');
-    const playerNameInput = document.getElementById('player-name');
-    
-    if (startGameBtn) {
-        startGameBtn.addEventListener('click', handleStartGame);
-        startGameBtn.addEventListener('mousedown', handleStartGame);
-    }
-    
-    if (viewLeaderboardBtn) {
-        viewLeaderboardBtn.addEventListener('click', handleViewLeaderboard);
-        viewLeaderboardBtn.addEventListener('mousedown', handleViewLeaderboard);
-    }
-    
-    if (playerNameInput) {
-        playerNameInput.addEventListener('input', function(e) {
-            gameState.playerName = e.target.value.trim();
-        });
+    document.getElementById('splash-screen').addEventListener('click', () => {
+        if (!AudioManager.userInteracted) {
+            AudioManager.userInteracted = true;
+            AudioManager.play('home');
+        }
+        showScreen('welcome');
+    }, { once: true }); 
+
+    const gameScreen = document.getElementById('game-screen');
+    let lastTouchTime = 0;
+    gameScreen.addEventListener('touchstart', (e) => {
+        // Prevent flapping when pause button is tapped
+        if (e.target.id === 'pause-btn') {
+            return;
+        }
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastTouchTime < GAME_CONFIG.tapCooldown) return;
+        lastTouchTime = now;
+
+        if (gameState.waitingForFirstInput) {
+            startFirstFlap();
+        } else if (GAME_CONFIG.controlMode === 'keyboard' && gameState.gameRunning && !gameState.gamePaused) {
+            flapAndCount();
+        }
+    }, { passive: false });
+
+    // Add mouse click listener for flapping
+    let lastClickTime = 0;
+    gameScreen.addEventListener('mousedown', (e) => {
+        // Prevent flapping when pause button is clicked
+        if (e.target.id === 'pause-btn') {
+            return;
+        }
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastClickTime < GAME_CONFIG.tapCooldown) return;
+        lastClickTime = now;
+
+        if (gameState.waitingForFirstInput) {
+            startFirstFlap();
+        } else if (GAME_CONFIG.controlMode === 'keyboard' && gameState.gameRunning && !gameState.gamePaused) {
+            flapAndCount();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyP') togglePause();
         
-        playerNameInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (gameState.playerName) {
-                    handleStartGame();
-                }
+        if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+             e.preventDefault();
+            if (gameState.waitingForFirstInput) {
+                startFirstFlap();
+            } else if (GAME_CONFIG.controlMode === 'keyboard' && gameState.gameRunning && !gameState.gamePaused) {
+                flapAndCount();
             }
-        });
-    }
-    
-    // Calibration screen
-    const continueGameBtn = document.getElementById('continue-game-btn');
-    const backToWelcomeBtn = document.getElementById('back-to-welcome-btn');
-    const testVoiceBtn = document.getElementById('test-voice-btn');
-    const sensitivitySlider = document.getElementById('sensitivity-slider');
-    
-    if (continueGameBtn) {
-        continueGameBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            startCountdown();
-        });
-    }
-    
-    if (backToWelcomeBtn) {
-        backToWelcomeBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            stopCalibration();
-            showScreen('welcome');
-        });
-    }
-    
-    if (testVoiceBtn) {
-        testVoiceBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            toggleVoiceTest();
-        });
-    }
-    
-    if (sensitivitySlider) {
-        sensitivitySlider.addEventListener('input', function(e) {
-            VOICE_CONFIG.amplitudeThreshold = parseFloat(e.target.value);
-            updateThresholdLine();
-        });
-    }
-    
-    // Game over screen
-    const tryAgainBtn = document.getElementById('try-again-btn');
-    const newPlayerBtn = document.getElementById('new-player-btn');
-    const viewScoresBtn = document.getElementById('view-scores-btn');
-    const mainMenuBtn = document.getElementById('main-menu-btn');
-    
-    if (tryAgainBtn) {
-        tryAgainBtn.addEventListener('click', function(e) {
+        }
+    });
+
+    document.getElementById('start-game-btn').addEventListener('click', handleStartGame);
+    document.getElementById('view-leaderboard-btn').addEventListener('click', handleViewLeaderboard);
+    document.getElementById('player-name').addEventListener('input', (e) => gameState.playerName = e.target.value.trim());
+    document.getElementById('player-name').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
             e.preventDefault();
             handleStartGame();
-        });
-    }
-    
-    if (newPlayerBtn) {
-        newPlayerBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            gameState.playerName = '';
-            document.getElementById('player-name').value = '';
-            showScreen('welcome');
-        });
-    }
-    
-    if (viewScoresBtn) {
-        viewScoresBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            showLeaderboard();
-        });
-    }
-    
-    if (mainMenuBtn) {
-        mainMenuBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            showScreen('welcome');
-        });
-    }
-    
-    // Leaderboard screen
-    const playAgainBtn = document.getElementById('play-again-btn');
-    const backToMenuBtn = document.getElementById('back-to-menu-btn');
-    
-    if (playAgainBtn) {
-        playAgainBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            handleStartGame();
-        });
-    }
-    
-    if (backToMenuBtn) {
-        backToMenuBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            showScreen('welcome');
-        });
-    }
-    
-    // Game controls
-    const pauseBtn = document.getElementById('pause-btn');
-    const gameSensitivity = document.getElementById('game-sensitivity');
-    
-    if (pauseBtn) {
-        pauseBtn.addEventListener('click', togglePause);
-    }
-    
-    if (gameSensitivity) {
-        gameSensitivity.addEventListener('input', function(e) {
-            VOICE_CONFIG.amplitudeThreshold = parseFloat(e.target.value);
-        });
-    }
-    
-    // Microphone permission modal
-    const requestMicBtn = document.getElementById('request-mic-btn');
-    const cancelMicBtn = document.getElementById('cancel-mic-btn');
-    
-    if (requestMicBtn) {
-        requestMicBtn.addEventListener('click', requestMicrophonePermission);
-    }
-    
-    if (cancelMicBtn) {
-        cancelMicBtn.addEventListener('click', function() {
-            hideModal('mic-permission-modal');
-        });
-    }
-    
-    // Troubleshoot modal
-    const closeTroubleshootBtn = document.getElementById('close-troubleshoot-btn');
-    const testAgainBtn = document.getElementById('test-again-btn');
-    
-    if (closeTroubleshootBtn) {
-        closeTroubleshootBtn.addEventListener('click', function() {
-            hideModal('troubleshoot-modal');
-        });
-    }
-    
-    if (testAgainBtn) {
-        testAgainBtn.addEventListener('click', function() {
-            hideModal('troubleshoot-modal');
-            showScreen('calibration');
-            startCalibration();
-        });
-    }
-    
-    console.log('Event listeners setup complete');
+        }
+    });
+    document.getElementById('continue-game-btn').addEventListener('click', startCountdown);
+    document.getElementById('back-to-welcome-btn').addEventListener('click', () => { stopCalibration(); showScreen('welcome'); });
+    document.getElementById('test-voice-btn').addEventListener('click', toggleVoiceTest);
+    document.getElementById('sensitivity-slider').addEventListener('input', (e) => { VOICE_CONFIG.amplitudeThreshold = parseFloat(e.target.value); updateThresholdLine(); });
+    document.getElementById('try-again-btn').addEventListener('click', handleStartGame);
+    document.getElementById('new-player-btn').addEventListener('click', () => { gameState.playerName = ''; document.getElementById('player-name').value = ''; showScreen('welcome'); });
+    document.getElementById('view-scores-btn').addEventListener('click', showLeaderboard);
+    document.getElementById('play-again-btn').addEventListener('click', handleStartGame);
+    document.getElementById('back-to-menu-btn').addEventListener('click', () => showScreen('welcome'));
+    document.getElementById('pause-btn').addEventListener('click', togglePause);
+    document.getElementById('request-mic-btn').addEventListener('click', requestMicrophonePermission);
+    document.getElementById('cancel-mic-btn').addEventListener('click', () => hideModal('mic-permission-modal'));
+    document.getElementById('close-troubleshoot-btn').addEventListener('click', () => hideModal('troubleshoot-modal'));
+    document.getElementById('test-again-btn').addEventListener('click', () => { hideModal('troubleshoot-modal'); showScreen('calibration'); startCalibration(); });
 }
 
-function handleStartGame(e) {
-    if (e) e.preventDefault();
-    
-    const playerNameInput = document.getElementById('player-name');
-    let playerName = gameState.playerName;
-    
-    if (playerNameInput && playerNameInput.value.trim()) {
-        playerName = playerNameInput.value.trim();
-        gameState.playerName = playerName;
-    }
-    
-    if (!playerName) {
-        if (playerNameInput) {
-            playerNameInput.focus();
-            playerNameInput.style.borderColor = 'var(--color-error)';
-            setTimeout(() => {
-                playerNameInput.style.borderColor = '';
-            }, 2000);
-        }
-        alert('Please enter your name to start the game!');
+function flapAndCount() {
+    flapBird();
+    gameState.commandCount++;
+    updateCommandCounter();
+}
+
+function startFirstFlap() {
+    if(!gameState.waitingForFirstInput) return;
+    const waitingMessage = document.getElementById('waiting-message');
+    if (waitingMessage) waitingMessage.remove();
+    gameState.waitingForFirstInput = false;
+    AudioManager.stopMusic();
+    AudioManager.play('bgm');
+    flapAndCount(); 
+    gameLoop();
+}
+
+function handleStartGame() {
+    if (!gameState.playerName.trim()) {
+        const input = document.getElementById('player-name');
+        input.focus();
+        input.style.borderColor = 'var(--color-error)';
+        setTimeout(() => { input.style.borderColor = ''; }, 2000);
         return;
     }
     
+    AudioManager.play('name');
     showScreen('calibration');
-    startCalibration();
-}
-
-function handleViewLeaderboard(e) {
-    if (e) e.preventDefault();
-    showLeaderboard();
-}
-
-// Enhanced Voice Recognition System
-function setupEnhancedVoiceRecognition() {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        
-        recognition.continuous = VOICE_CONFIG.continuousRecognition;
-        recognition.interimResults = VOICE_CONFIG.interimResults;
-        recognition.maxAlternatives = VOICE_CONFIG.maxAlternatives;
-        recognition.lang = 'en-US';
-        
-        recognition.onresult = function(event) {
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript.toLowerCase().trim();
-                
-                if (VOICE_COMMANDS.some(command => transcript.includes(command))) {
-                    handleVoiceCommand('speech', transcript);
-                }
-            }
-        };
-        
-        recognition.onerror = function(event) {
-            console.log('Speech recognition error:', event.error);
-            if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                updateMicrophoneStatus('Recognition Error');
-                setTimeout(() => restartSpeechRecognition(), VOICE_CONFIG.restartDelay);
-            }
-        };
-        
-        recognition.onend = function() {
-            if (isListening && (gameState.gameRunning || gameState.calibrationMode)) {
-                setTimeout(() => restartSpeechRecognition(), VOICE_CONFIG.restartDelay);
-            }
-        };
+    if (GAME_CONFIG.controlMode === 'voice') {
+        startCalibration();
     }
 }
 
-function restartSpeechRecognition() {
-    if (!recognition || !isListening) return;
-    
-    try {
-        recognition.start();
-    } catch (error) {
-        if (error.name !== 'InvalidStateError') {
-            console.error('Error restarting recognition:', error);
-        }
+function handleViewLeaderboard() {
+    showLeaderboard();
+}
+
+function setupEnhancedVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript.toLowerCase().trim();
+                if (VOICE_COMMANDS.some(command => transcript.includes(command))) {
+                    handleVoiceCommand('speech', transcript);
+                    if (recognition) recognition.stop(); 
+                }
+            }
+        };
+        recognition.onend = () => { if (isListening && recognition) recognition.start(); };
+        recognition.onerror = (event) => console.error('Speech recognition error:', event.error);
     }
 }
 
 async function initializeAudioContext() {
     if (isAudioInitialized) return true;
-    
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        microphoneStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 44100
-            }
-        });
-        
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = VOICE_CONFIG.fftSize;
-        analyserNode.smoothingTimeConstant = VOICE_CONFIG.smoothingTimeConstant;
-        
+        analyserNode.fftSize = 256;
         const source = audioContext.createMediaStreamSource(microphoneStream);
         source.connect(analyserNode);
-        
         dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-        
         isAudioInitialized = true;
         startAmplitudeDetection();
         return true;
-    } catch (error) {
-        console.error('Error initializing audio context:', error);
+    } catch(err) {
+        console.error("Error initializing audio context:", err);
         return false;
     }
 }
 
 function startAmplitudeDetection() {
-    if (!isAudioInitialized || !analyserNode || !dataArray) return;
-    
+    if (!isAudioInitialized || amplitudeDetectionActive) return;
     amplitudeDetectionActive = true;
-    isAboveThreshold = false;
     
-    function detectAmplitude() {
+    function detect() {
         if (!amplitudeDetectionActive) return;
-        
         analyserNode.getByteFrequencyData(dataArray);
-        
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        updateVoiceLevelIndicators(average / 128); 
+        if (average / 128 > VOICE_CONFIG.amplitudeThreshold) {
+            handleVoiceCommand('amplitude', 'sound detected');
         }
-        const averageAmplitude = sum / dataArray.length;
-        const normalizedAmplitude = averageAmplitude / 255;
-        
-        updateVoiceLevelIndicators(normalizedAmplitude);
-        
-        const currentTime = Date.now();
-        
-        if (normalizedAmplitude > VOICE_CONFIG.amplitudeThreshold) {
-            if (!isAboveThreshold || (currentTime - lastCommandTime > GAME_CONFIG.tapCooldown)) {
-                isAboveThreshold = true;
-                handleVoiceCommand('amplitude', 'sound detected');
-                lastCommandTime = currentTime;
-            }
-        } else {
-            isAboveThreshold = false;
-        }
-        
-        voiceAnimationFrame = requestAnimationFrame(detectAmplitude);
+        voiceAnimationFrame = requestAnimationFrame(detect);
     }
-    
-    detectAmplitude();
+    detect();
 }
 
 function stopAmplitudeDetection() {
     amplitudeDetectionActive = false;
-    isAboveThreshold = false;
-    if (voiceAnimationFrame) {
-        cancelAnimationFrame(voiceAnimationFrame);
-        voiceAnimationFrame = null;
-    }
+    if (voiceAnimationFrame) cancelAnimationFrame(voiceAnimationFrame);
 }
 
 function updateVoiceLevelIndicators(level) {
-    const voiceLevelBar = document.getElementById('voice-level-bar');
-    if (voiceLevelBar) {
-        voiceLevelBar.style.width = `${Math.min(level * 100, 100)}%`;
-    }
-    
-    const countdownVoiceBar = document.getElementById('countdown-voice-bar');
-    if (countdownVoiceBar) {
-        countdownVoiceBar.style.width = `${Math.min(level * 100, 100)}%`;
-    }
-    
-    const gameVoiceBar = document.getElementById('game-voice-bar');
-    if (gameVoiceBar) {
-        gameVoiceBar.style.width = `${Math.min(level * 100, 100)}%`;
-    }
+    const width = `${Math.min(level * 100, 100)}%`;
+    document.querySelectorAll('#voice-level-bar, #countdown-voice-bar, #game-voice-bar').forEach(bar => {
+        if(bar) bar.style.width = width;
+    });
 }
 
 function updateThresholdLine() {
-    const thresholdLine = document.querySelector('.voice-threshold-line');
-    if (thresholdLine) {
-        thresholdLine.style.left = `${VOICE_CONFIG.amplitudeThreshold * 100}%`;
-    }
+    const line = document.querySelector('.voice-threshold-line');
+    if (line) line.style.left = `${VOICE_CONFIG.amplitudeThreshold * 100}%`;
 }
 
 function handleVoiceCommand(source, command) {
-    // Only process voice commands if in voice mode
-    if (GAME_CONFIG.controlMode !== 'voice') return;
+    if (GAME_CONFIG.controlMode !== 'voice' || (Date.now() - lastCommandTime < GAME_CONFIG.tapCooldown)) return;
+    lastCommandTime = Date.now();
 
     if (gameState.calibrationMode) {
-        handleCalibrationCommand(source, command);
-        return;
-    }
-    
-    if (gameState.waitingForFirstInput) {
-        const waitingMessage = document.getElementById('waiting-message');
-        if (waitingMessage) {
-            waitingMessage.remove();
-        }
-        gameState.waitingForFirstInput = false;
-        gameLoop();
-    }
-    
-    if (gameState.gameRunning && !gameState.gamePaused && !gameState.waitingForFirstInput) {
-        flapBird();
-        gameState.commandCount++;
-        updateCommandCounter();
+        gameState.testDetectionCount++;
+        updateDetectionCount();
+    } else if (gameState.waitingForFirstInput) {
+        startFirstFlap();
+    } else if (gameState.gameRunning && !gameState.gamePaused) {
+        flapAndCount();
         showVoiceFeedback(command, source);
-        updateMicrophoneStatus('Command Detected!', true);
-        
-        setTimeout(() => {
-            updateMicrophoneStatus('Listening...');
-        }, 400);
-    }
-}
-
-function handleCalibrationCommand(source, command) {
-    gameState.testDetectionCount++;
-    updateDetectionCount();
-    
-    const feedback = document.getElementById('voice-test-feedback');
-    if (feedback) {
-        feedback.textContent = `✅ ${source.toUpperCase()}: "${command}"`;
-        feedback.classList.add('detected');
-        
-        setTimeout(() => {
-            feedback.classList.remove('detected');
-        }, 1000);
     }
 }
 
 function showVoiceFeedback(command, source) {
-    let feedback = document.getElementById('voice-feedback');
-    if (!feedback) {
-        feedback = document.createElement('div');
-        feedback.id = 'voice-feedback';
-        document.getElementById('game-screen').appendChild(feedback);
-    }
-    
-    const displayText = source === 'amplitude' ? '🔊 SOUND' : `💬 "${command}"`;
-    feedback.textContent = displayText;
+    const feedback = document.getElementById('voice-feedback');
+    if (!feedback) return;
+    feedback.textContent = source === 'speech' ? `"${command.split(" ").pop()}"` : 'SOUND!';
     feedback.classList.add('show');
-    
-    setTimeout(() => {
-        feedback.classList.remove('show');
-    }, 800);
+    setTimeout(() => feedback.classList.remove('show'), 800);
 }
 
 function updateCommandCounter() {
-    const commandCount = document.getElementById('command-count');
-    if (commandCount) {
-        commandCount.textContent = gameState.commandCount;
-    }
+    document.getElementById('command-count').textContent = gameState.commandCount;
 }
 
 function updateDetectionCount() {
-    const detectionSpan = document.querySelector('#detection-count span');
-    if (detectionSpan) {
-        detectionSpan.textContent = gameState.testDetectionCount;
-    }
-}
-
-function updateMicrophoneStatus(status, detected = false) {
-    const micStatus = document.getElementById('mic-status');
-    const micIndicator = document.getElementById('mic-indicator');
-    const countdownVoiceText = document.getElementById('countdown-voice-text');
-    
-    if (micStatus) {
-        micStatus.textContent = status;
-    }
-    
-    if (countdownVoiceText) {
-        countdownVoiceText.textContent = status;
-    }
-    
-    if (micIndicator) {
-        micIndicator.classList.remove('listening', 'detected');
-        
-        if (detected) {
-            micIndicator.classList.add('detected');
-        } else if (isListening) {
-            micIndicator.classList.add('listening');
-        }
-    }
+    document.querySelector('#detection-count span').textContent = gameState.testDetectionCount;
 }
 
 async function requestMicrophonePermission() {
     hideModal('mic-permission-modal');
-    
-    const audioInitialized = await initializeAudioContext();
-    
-    if (audioInitialized && recognition) {
-        try {
-            recognition.start();
-            isListening = true;
-            updateMicrophoneStatus('Listening...');
-        } catch (error) {
-            console.error('Error starting speech recognition:', error);
-            updateMicrophoneStatus('Permission Denied');
-        }
+    const success = await initializeAudioContext();
+    if (success && recognition) {
+        isListening = true;
+        recognition.start();
     }
 }
 
@@ -671,117 +574,66 @@ function startCalibration() {
     gameState.testDetectionCount = 0;
     updateDetectionCount();
     updateThresholdLine();
-    
-    const gameSensitivity = document.getElementById('game-sensitivity');
-    if (gameSensitivity) {
-        gameSensitivity.value = VOICE_CONFIG.amplitudeThreshold;
-    }
-    
     if (!isAudioInitialized) {
         showModal('mic-permission-modal');
     } else if (!isListening && recognition) {
-        try {
-            recognition.start();
-            isListening = true;
-        } catch (error) {
-            console.error('Error starting recognition in calibration:', error);
-        }
+        isListening = true;
+        recognition.start();
     }
 }
 
 function stopCalibration() {
     gameState.calibrationMode = false;
-    
-    if (recognition && isListening) {
-        recognition.stop();
-        isListening = false;
-    }
+    isListening = false;
+    if (recognition) recognition.stop();
+    stopAmplitudeDetection();
 }
 
 function toggleVoiceTest() {
     const testBtn = document.getElementById('test-voice-btn');
-    
-    if (gameState.calibrationMode) {
-        gameState.testDetectionCount = 0;
-        updateDetectionCount();
-        
-        if (testBtn) {
-            testBtn.textContent = 'Testing... (Try voice commands!)';
-            testBtn.disabled = true;
-        }
-        
-        setTimeout(() => {
-            if (testBtn) {
-                testBtn.textContent = 'Test Voice Commands';
-                testBtn.disabled = false;
-            }
-        }, 5000);
-    }
+    testBtn.textContent = 'Testing... Speak!';
+    testBtn.disabled = true;
+    setTimeout(() => {
+        testBtn.textContent = 'Test Voice Commands';
+        testBtn.disabled = false;
+    }, 5000);
 }
 
 function startCountdown() {
+    stopCalibration();
     showScreen('countdown');
-    gameState.calibrationMode = false;
+    // NEW: Play countdown sound
+    AudioManager.play('countdown'); 
     
     let count = 3;
-    const countdownNumber = document.getElementById('countdown-number');
-    
-    const updateCountdown = () => {
-        if (countdownNumber) {
-            countdownNumber.textContent = count;
-            countdownNumber.style.animation = 'none';
-            setTimeout(() => {
-                countdownNumber.style.animation = 'countdownPulse 1s ease-in-out';
-            }, 10);
-        }
-        
+    const numberEl = document.getElementById('countdown-number');
+    numberEl.textContent = count;
+    const interval = setInterval(() => {
         count--;
-        
-        if (count < 0) {
+        if(numberEl) numberEl.textContent = count;
+        if (count <= 0) {
+            clearInterval(interval);
             startGameplay();
-        } else {
-            setTimeout(updateCountdown, 1000);
         }
-    };
-    
-    updateCountdown();
+    }, 1000);
 }
 
 function startGameplay() {
     showScreen('game');
-    canvas.focus();
     resetGame();
     gameState.gameRunning = true;
-    gameState.gamePaused = false;
     gameState.waitingForFirstInput = true;
-    isAboveThreshold = false;
     
     const waitingMessage = document.createElement('div');
     waitingMessage.id = 'waiting-message';
-    waitingMessage.textContent = GAME_CONFIG.controlMode === 'voice' 
-    ? 'Make a sound OR press SPACE to start!' 
-    : 'Press SPACE to start!';
-    waitingMessage.style.position = 'absolute';
-    waitingMessage.style.top = '50%';
-    waitingMessage.style.left = '50%';
-    waitingMessage.style.transform = 'translate(-50%, -50%)';
-    waitingMessage.style.color = 'white';
-    waitingMessage.style.fontSize = '24px';
-    waitingMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
-    document.getElementById('game-screen').appendChild(waitingMessage);
-    
-    if (recognition && !isListening) {
-        try {
-            recognition.start();
-            isListening = true;
-            updateMicrophoneStatus('Listening...');
-        } catch (error) {
-            console.error('Error starting speech recognition:', error);
-        }
-    }
-    
-    if (isAudioInitialized && !amplitudeDetectionActive) {
-        startAmplitudeDetection();
+    waitingMessage.textContent = GAME_CONFIG.controlMode === 'voice' ? 'Make a sound to start!' : 'Tap or press SPACE to start!';
+    waitingMessage.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-size:24px; text-shadow:2px 2px 4px #000; z-index: 10;';
+    document.getElementById('game-container').appendChild(waitingMessage);
+
+    if (GAME_CONFIG.controlMode === 'voice' && !isListening) {
+        isListening = true;
+        if(recognition) recognition.start();
+        if(!amplitudeDetectionActive) startAmplitudeDetection();
     }
 }
 
@@ -790,290 +642,137 @@ function resetGame() {
     gameState.commandCount = 0;
     updateScoreDisplay();
     updateCommandCounter();
-    updateControlModeUI();
     resetBird();
     pipes = [];
     generateInitialPipes();
 }
 
 function resetBird() {
-    bird = {
-        x: GAME_CONFIG.birdStartX,
-        y: GAME_CONFIG.birdStartY,
-        velocity: 0,
-        size: GAME_CONFIG.birdSize
-    };
+    bird = { x: GAME_CONFIG.birdStartX, y: GAME_CONFIG.birdStartY, velocity: 0, size: GAME_CONFIG.birdSize };
 }
 
 function generateInitialPipes() {
-    for (let i = 0; i < 3; i++) {
-        pipes.push(createPipe(GAME_CONFIG.gameWidth + i * 300));
+     for (let i = 0; i < 3; i++) {
+        pipes.push(createPipe(GAME_CONFIG.gameWidth + i * 400));
     }
 }
 
 function createPipe(x) {
-    const gapStart = Math.random() * (GAME_CONFIG.gameHeight - GAME_CONFIG.pipeGap - 100) + 50;
-    return {
-        x: x,
-        topHeight: gapStart,
-        bottomY: gapStart + GAME_CONFIG.pipeGap,
-        bottomHeight: GAME_CONFIG.gameHeight - (gapStart + GAME_CONFIG.pipeGap),
-        width: GAME_CONFIG.pipeWidth,
-        passed: false
-    };
+    const topHeight = Math.random() * (GAME_CONFIG.gameHeight - GAME_CONFIG.pipeGap - 100) + 50;
+    return { x, topHeight, bottomY: topHeight + GAME_CONFIG.pipeGap, passed: false };
 }
 
 function flapBird() {
-    if (bird) {
-        bird.velocity = GAME_CONFIG.flapStrength;
-    }
+    if (bird) bird.velocity = GAME_CONFIG.flapStrength;
 }
 
 function gameLoop() {
-    if (!gameState.gameRunning || gameState.gamePaused || gameState.waitingForFirstInput) {
-        return;
-    }
-    
+    if (!gameState.gameRunning || gameState.gamePaused || gameState.waitingForFirstInput) return;
     updateGame();
     drawGame();
-    
     animationFrame = requestAnimationFrame(gameLoop);
 }
 
 function updateGame() {
-    // Update bird
     bird.velocity += GAME_CONFIG.gravity;
     bird.y += bird.velocity;
-    
-    // Update pipes
-    for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= GAME_CONFIG.pipeSpeed;
-        
-        // Check for scoring
-        if (!pipes[i].passed && pipes[i].x + pipes[i].width < bird.x) {
-            pipes[i].passed = true;
+
+    pipes.forEach(pipe => {
+        pipe.x -= GAME_CONFIG.pipeSpeed;
+        if (!pipe.passed && pipe.x + GAME_CONFIG.pipeWidth < bird.x) {
+            pipe.passed = true;
             gameState.score++;
             updateScoreDisplay();
+            AudioManager.play('score');
         }
-        
-        // Remove pipes that are off screen
-        if (pipes[i].x + pipes[i].width < 0) {
-            pipes.splice(i, 1);
-        }
+    });
+
+    if (pipes.length > 0 && pipes[0].x < -GAME_CONFIG.pipeWidth) {
+        pipes.shift();
     }
     
-    // Add new pipes
-    if (pipes.length === 0 || pipes[pipes.length - 1].x < GAME_CONFIG.gameWidth - 300) {
-        pipes.push(createPipe(GAME_CONFIG.gameWidth));
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 300) {
+        pipes.push(createPipe(canvas.width));
     }
-    
-    // Check collisions
-    if (checkCollisions()) {
-        endGame();
-    }
+
+    if (checkCollisions()) endGame();
 }
 
 function checkCollisions() {
-    // Ground and ceiling collision
-    if (bird.y + bird.size > GAME_CONFIG.gameHeight || bird.y < 0) {
-        return true;
-    }
-    
-    // Pipe collision
+    if (bird.y > canvas.height - bird.size || bird.y < 0) return true;
     for (const pipe of pipes) {
-        if (bird.x + bird.size > pipe.x && bird.x < pipe.x + pipe.width) {
-            if (bird.y < pipe.topHeight || bird.y + bird.size > pipe.bottomY) {
-                return true;
-            }
+        if (bird.x + bird.size > pipe.x && bird.x < pipe.x + GAME_CONFIG.pipeWidth &&
+            (bird.y < pipe.topHeight || bird.y + bird.size > pipe.bottomY)) {
+            return true;
         }
     }
-    
     return false;
 }
 
 function drawGame() {
-    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Clear canvas
-    ctx.fillStyle = '#87CEEB';
-    ctx.fillRect(0, 0, GAME_CONFIG.gameWidth, GAME_CONFIG.gameHeight);
-    
-    // Draw clouds
-    drawClouds();
-    
-    // Draw pipes
-    ctx.fillStyle = '#228B22';
-    for (const pipe of pipes) {
-        // Top pipe
-        ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
-        
-        // Bottom pipe
-        ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, pipe.bottomHeight);
-        
-        // Pipe caps
-        ctx.fillStyle = '#2F4F2F';
-        ctx.fillRect(pipe.x - 5, pipe.topHeight - 20, pipe.width + 10, 20);
-        ctx.fillRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 20);
+    pipes.forEach(pipe => {
         ctx.fillStyle = '#228B22';
+        ctx.fillRect(pipe.x, 0, GAME_CONFIG.pipeWidth, pipe.topHeight);
+        ctx.fillRect(pipe.x, pipe.bottomY, GAME_CONFIG.pipeWidth, canvas.height - pipe.bottomY);
+    });
+
+    if (birdImg && birdImg.complete && birdImg.naturalHeight !== 0) {
+        ctx.save();
+        ctx.translate(bird.x + bird.size / 2, bird.y + bird.size / 2);
+        
+        let rotation = Math.max(Math.min(bird.velocity * 0.1, Math.PI / 2), -Math.PI / 9);
+        ctx.rotate(rotation);
+        
+        ctx.drawImage(birdImg, -bird.size / 2, -bird.size / 2, bird.size, bird.size);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.arc(bird.x + bird.size/2, bird.y + bird.size/2, bird.size/2, 0, Math.PI * 2);
+        ctx.fill();
     }
-    
-    // Draw bird
-    drawBird();
-    
-    // Draw ground
-    ctx.fillStyle = '#8B4513';
-    ctx.fillRect(0, GAME_CONFIG.gameHeight - 50, GAME_CONFIG.gameWidth, 50);
-}
-
-function drawClouds() {
-    if (!ctx) return;
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    
-    // Static clouds for visual appeal
-    drawCloud(150, 100, 40);
-    drawCloud(400, 80, 60);
-    drawCloud(650, 120, 50);
-    drawCloud(200, 200, 35);
-    drawCloud(500, 180, 45);
-}
-
-function drawCloud(x, y, size) {
-    if (!ctx) return;
-    
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
-    ctx.arc(x + size * 0.6, y, size * 0.8, 0, Math.PI * 2);
-    ctx.arc(x + size * 1.2, y, size, 0, Math.PI * 2);
-    ctx.arc(x + size * 1.8, y, size * 0.7, 0, Math.PI * 2);
-    ctx.arc(x + size * 2.2, y, size * 0.9, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-function drawBird() {
-    if (!ctx || !bird) return;
-    
-    const centerX = bird.x + bird.size / 2;
-    const centerY = bird.y + bird.size / 2;
-    
-    // Bird body
-    ctx.fillStyle = '#FFD700';
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, bird.size / 2, bird.size / 2 * 0.8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Bird wing
-    ctx.fillStyle = '#FFA500';
-    ctx.beginPath();
-    const wingOffset = bird.velocity < 0 ? -5 : 0;
-    ctx.ellipse(centerX - 5, centerY + wingOffset, bird.size / 3, bird.size / 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Bird eye
-    ctx.fillStyle = '#000000';
-    ctx.beginPath();
-    ctx.arc(centerX + 8, centerY - 5, 3, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Bird beak
-    ctx.fillStyle = '#FF6347';
-    ctx.beginPath();
-    ctx.moveTo(centerX + bird.size / 2, centerY);
-    ctx.lineTo(centerX + bird.size / 2 + 10, centerY - 3);
-    ctx.lineTo(centerX + bird.size / 2, centerY + 3);
-    ctx.closePath();
-    ctx.fill();
 }
 
 function updateScoreDisplay() {
-    const scoreElement = document.getElementById('current-score');
-    if (scoreElement) {
-        scoreElement.textContent = gameState.score;
-    }
+    document.getElementById('current-score').textContent = gameState.score;
 }
 
 function endGame() {
+    if (!gameState.gameRunning) return;
     gameState.gameRunning = false;
-    
-    if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-    }
-    
+    cancelAnimationFrame(animationFrame);
+    isListening = false;
+    if(recognition) recognition.stop();
     stopAmplitudeDetection();
-    if (recognition && isListening) {
-        recognition.stop();
-        isListening = false;
-    }
+    
+    AudioManager.stopAll();
     
     addToLeaderboard(gameState.playerName, gameState.score, gameState.commandCount);
-    showGameOverScreen();
+
+    AudioManager.play('lose', () => {
+        showGameOverScreen(); 
+        AudioManager.play('gameover', () => { 
+            setTimeout(() => AudioManager.play('home'), 500);
+        });
+    });
 }
 
-function addToLeaderboard(playerName, score, commands) {
-    const entry = {
-        playerName: playerName,
-        score: score,
-        commands: commands,
-        date: new Date().toLocaleString()
-    };
-    
-    gameState.highScores.push(entry);
-    gameState.highScores.sort((a, b) => b.score - a.score);
-    
-    if (gameState.highScores.length > 10) {
-        gameState.highScores = gameState.highScores.slice(0, 10);
-    }
-    
+function addToLeaderboard(name, score, commands) {
+    gameState.highScores.push({ playerName: name, score, commands, date: new Date().toLocaleDateString() });
+    gameState.highScores.sort((a, b) => b.score - a.score).splice(10);
     saveHighScores();
 }
 
 function showGameOverScreen() {
-    const finalScoreElement = document.getElementById('final-score-value');
-    const finalCommandsElement = document.getElementById('final-commands');
-    const detectionRateElement = document.getElementById('detection-rate');
-    
-    if (finalScoreElement) {
-        finalScoreElement.textContent = gameState.score;
-    }
-    
-    if (finalCommandsElement) {
-        finalCommandsElement.textContent = gameState.commandCount;
-    }
-    
-    if (detectionRateElement && gameState.commandCount > 0) {
-        const detectionRate = Math.min(100, (gameState.commandCount / Math.max(gameState.commandCount, 1)) * 100);
-        detectionRateElement.textContent = `${detectionRate.toFixed(0)}%`;
-    }
-    
-    const isNewRecord = gameState.highScores.length > 0 && 
-                       gameState.score === gameState.highScores[0].score;
-    
-    const newRecordElement = document.getElementById('new-record');
-    if (newRecordElement) {
-        if (isNewRecord) {
-            newRecordElement.classList.remove('hidden');
-        } else {
-            newRecordElement.classList.add('hidden');
-        }
-    }
-    
-    const currentRank = getCurrentPlayerRank();
-    const rankElement = document.getElementById('rank-value');
-    if (rankElement) {
-        rankElement.textContent = currentRank > 0 ? `#${currentRank}` : 'Not in Top 10';
-    }
-    
+    document.getElementById('final-score-value').textContent = gameState.score;
+    document.getElementById('final-commands').textContent = gameState.commandCount;
+    const isNewRecord = gameState.highScores.length > 0 && gameState.score > 0 && gameState.score >= gameState.highScores[0].score;
+    document.getElementById('new-record').classList.toggle('hidden', !isNewRecord);
+    const rank = gameState.highScores.findIndex(s => s.playerName === gameState.playerName && s.score === gameState.score) + 1;
+    document.getElementById('rank-value').textContent = rank > 0 ? `#${rank}` : 'N/A';
     showScreen('gameOver');
-}
-
-function getCurrentPlayerRank() {
-    for (let i = 0; i < gameState.highScores.length; i++) {
-        if (gameState.highScores[i].playerName === gameState.playerName && 
-            gameState.highScores[i].score === gameState.score) {
-            return i + 1;
-        }
-    }
-    return -1;
 }
 
 function showLeaderboard() {
@@ -1082,208 +781,73 @@ function showLeaderboard() {
 }
 
 function updateLeaderboardDisplay() {
-    const leaderboardList = document.getElementById('leaderboard-list');
-    if (!leaderboardList) return;
-    
-    if (gameState.highScores.length === 0) {
-        leaderboardList.innerHTML = '<div class="empty-leaderboard">No scores yet! Be the first to play!</div>';
-        return;
-    }
-    
-    const currentPlayerName = gameState.playerName;
-    
-    leaderboardList.innerHTML = gameState.highScores.map((entry, index) => {
-        const isCurrentPlayer = entry.playerName === currentPlayerName && 
-                               entry.score === gameState.score;
-        
-        return `
-            <div class="leaderboard-entry ${isCurrentPlayer ? 'current-player' : ''}">
-                <div class="rank-col">#${index + 1}</div>
-                <div class="name-col">${entry.playerName}</div>
-                <div class="score-col">${entry.score}</div>
-                <div class="commands-col">${entry.commands || 0}</div>
-                <div class="date-col">${entry.date}</div>
-            </div>
-        `;
-    }).join('');
+    const list = document.getElementById('leaderboard-list');
+    if (!list) return;
+    list.innerHTML = gameState.highScores.length ? gameState.highScores.map((s, i) => `
+        <div class="leaderboard-entry">
+            <div class="rank-col">#${i + 1}</div>
+            <div class="name-col">${s.playerName}</div>
+            <div class="score-col">${s.score}</div>
+            <div class="commands-col">${s.commands}</div>
+            <div class="date-col">${s.date}</div>
+        </div>`).join('') : '<div class="empty-leaderboard">No scores yet! Be the first!</div>';
 }
 
 function togglePause() {
     if (!gameState.gameRunning) return;
-    
     gameState.gamePaused = !gameState.gamePaused;
-    const pauseBtn = document.getElementById('pause-btn');
+    const btn = document.getElementById('pause-btn');
+    if(btn) btn.textContent = gameState.gamePaused ? 'Resume ▶️' : 'Pause ⏸️';
     
-    if (pauseBtn) {
-        if (gameState.gamePaused) {
-            pauseBtn.textContent = 'Resume ▶️';
-            stopAmplitudeDetection();
-            if (recognition && isListening) {
-                recognition.stop();
-                isListening = false;
-            }
-        } else {
-            pauseBtn.textContent = 'Pause ⏸️';
-            gameLoop();
-            startAmplitudeDetection();
-            if (recognition && !isListening) {
-                try {
-                    recognition.start();
-                    isListening = true;
-                } catch (error) {
-                    console.log('Error starting recognition:', error);
-                }
-            }
-        }
+    if (gameState.gamePaused) {
+        if(AudioManager.sounds.bgm) AudioManager.sounds.bgm.pause();
+    } else {
+        if(AudioManager.sounds.bgm) AudioManager.sounds.bgm.play();
+        gameLoop();
     }
 }
 
 function showScreen(screenName) {
-    // Hide all screens
-    Object.values(screens).forEach(screen => {
-        if (screen) {
-            screen.classList.remove('active');
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[screenName].classList.add('active');
+    gameState.currentScreen = screenName;
+
+    const bgmScreens = ['game', 'countdown'];
+    const homeMusicScreens = ['welcome', 'leaderboard', 'calibration', 'gameOver'];
+
+    if (bgmScreens.includes(screenName)) {
+        AudioManager.stopMusic(); 
+    } else if (homeMusicScreens.includes(screenName)) {
+        if (AudioManager.isPlaying('bgm')) {
+             AudioManager.stopMusic(); 
         }
-    });
-    
-    // Show target screen
-    if (screens[screenName]) {
-        screens[screenName].classList.add('active');
-        gameState.currentScreen = screenName;
+        
+        if (screenName !== 'gameOver') {
+            AudioManager.play('home');
+        }
+    } else {
+        AudioManager.stopMusic();
     }
 }
 
-function showModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
 
-function hideModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-// CSV Storage Functions
 function saveHighScores() {
     try {
-        // Convert high scores to CSV
-        const csvContent = gameState.highScores.map(entry => 
-            `"${entry.playerName}",${entry.score},${entry.commands},"${entry.date}"`
-        ).join('\n');
-        
-        // Add header
-        const csvWithHeader = "Name,Score,Commands,Date\n" + csvContent;
-        
-        // Save to localStorage
-        localStorage.setItem('flappyBirdLeaderboard', csvWithHeader);
-    } catch (error) {
-        console.error('Error saving high scores:', error);
+        localStorage.setItem('flappyBirdScores', JSON.stringify(gameState.highScores));
+    } catch (e) {
+        console.error("Could not save scores to local storage.", e);
     }
 }
 
 function loadHighScores() {
     try {
-        const csvData = localStorage.getItem('flappyBirdLeaderboard');
-        if (!csvData) {
-            gameState.highScores = [];
-            return;
-        }
-        
-        // Parse CSV
-        const lines = csvData.split('\n');
-        gameState.highScores = [];
-        
-        // Skip header line (start from index 1)
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line) {
-                // Handle quoted fields with commas
-                const fields = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-                if (fields && fields.length >= 4) {
-                    const playerName = fields[0].replace(/"/g, '');
-                    const score = parseInt(fields[1]);
-                    const commands = parseInt(fields[2]);
-                    const date = fields[3].replace(/"/g, '');
-                    
-                    gameState.highScores.push({
-                        playerName: playerName,
-                        score: score,
-                        commands: commands,
-                        date: date
-                    });
-                }
-            }
-        }
-        
-        // Sort by score
-        gameState.highScores.sort((a, b) => b.score - a.score);
-    } catch (error) {
-        console.error('Error loading high scores:', error);
+        const scores = localStorage.getItem('flappyBirdScores');
+        gameState.highScores = scores ? JSON.parse(scores) : [];
+    } catch (e) {
+        console.error("Could not load scores from local storage.", e);
         gameState.highScores = [];
     }
 }
-
-// In the keyboard event listener (near the end of app.js)
-document.addEventListener('keydown', function(e) {
-    // Always allow these keys regardless of control mode
-    if (e.code === 'KeyP' && gameState.gameRunning) {
-        // Pause with P key (works in both modes)
-        e.preventDefault();
-        togglePause();
-        return;
-    }
-    
-    if (e.code === 'Escape') {
-        // Escape to go back (works in both modes)
-        e.preventDefault();
-        if (gameState.currentScreen === 'leaderboard' || gameState.currentScreen === 'gameOver') {
-            showScreen('welcome');
-        } else if (gameState.currentScreen === 'calibration') {
-            stopCalibration();
-            showScreen('welcome');
-        }
-        return;
-    }
-
-    // Handle space bar to start game in waiting state (works in both modes)
-    if (gameState.waitingForFirstInput && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW')) {
-        e.preventDefault();
-        const waitingMessage = document.getElementById('waiting-message');
-        if (waitingMessage) {
-            waitingMessage.remove();
-        }
-        gameState.waitingForFirstInput = false;
-        gameLoop();
-        return;
-    }
-
-    // Only process other game controls if in keyboard mode
-    if (GAME_CONFIG.controlMode !== 'keyboard') return;
-
-    // Rest of the keyboard controls...
-    if (gameState.gameRunning && !gameState.gamePaused && !gameState.waitingForFirstInput) {
-        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW' || 
-            e.code === 'Enter' || e.code === 'KeyF') {
-            e.preventDefault();
-            flapBird();
-            gameState.commandCount++;
-            updateCommandCounter();
-            showVoiceFeedback('keyboard', 'keyboard');
-        }
-    }
-    
-    // Calibration screen keyboard test (only in keyboard mode)
-    if (gameState.calibrationMode) {
-        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW' || 
-            e.code === 'Enter' || e.code === 'KeyF') {
-            e.preventDefault();
-            handleVoiceCommand('keyboard', 'keyboard input');
-        }
-    }
-});
-
-console.log('Enhanced Voice-Controlled Flappy Bird with dual detection system loaded!');
