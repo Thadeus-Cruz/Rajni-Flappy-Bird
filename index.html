@@ -6,6 +6,7 @@
     <title>Flappy Bird - Rajni Theme</title>
     <link rel="icon" type="image/png" href="flappy-bird.png">
     <link rel="stylesheet" href="style.css">
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
     <div class="container">
@@ -22,7 +23,6 @@
             <div class="welcome-content">
                 <h1 class="game-title">Controls</h1>
                 <p class="game-description">Use the following controls to make the bird fly.</p>
-
                 <div class="instructions">
                     <div id="keyboard-instructions">
                         <ul>
@@ -34,14 +34,22 @@
                         </ul>
                     </div>
                 </div>
-                
+
+                <div class="recaptcha-container">
+                    <div class="g-recaptcha"
+                         data-sitekey="your CAPTCHA Key"
+                         data-callback="onRecaptchaSuccess"
+                         data-expired-callback="onRecaptchaExpired">
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="player-name" class="form-label">Enter Your Name:</label>
-                    <input type="text" id="player-name" class="form-control" placeholder="Your name here..." maxlength="20">
+                    <div id="player-name-error" class="form-error hidden">Only letters and spaces are allowed.</div>
+                    <input type="text" id="player-name" class="form-control" placeholder="Solve CAPTCHA to enter name..." maxlength="20" disabled>
                 </div>
-                
                 <div class="button-group">
-                    <button id="start-game-btn" class="btn btn--primary btn--lg">Start Game 🚀</button>
+                    <button id="start-game-btn" class="btn btn--primary btn--lg" disabled>Start Game 🚀</button>
                     <button id="view-leaderboard-btn" class="btn btn--secondary btn--lg">Leaderboard 🏆</button>
                 </div>
             </div>
@@ -64,12 +72,10 @@
                     <span id="current-score" class="score-value">0</span>
                 </div>
             </div>
-            
             <div id="game-container" class="game-container">
                 <canvas id="game-canvas" width="800" height="600"></canvas>
                 <div id="flap-counter" class="command-counter">Flaps: <span id="flap-count">0</span></div>
             </div>
-            
             <div class="game-controls">
                 <button id="pause-btn" class="btn btn--outline btn--sm">Pause ⏸️</button>
             </div>
@@ -82,22 +88,18 @@
                     <p>Final Score:</p>
                     <div id="final-score-value" class="score-big">0</div>
                 </div>
-
                 <div id="game-stats" class="game-stats">
                     <div class="stat-item">
                         <span class="stat-label">Flaps:</span>
                         <span id="final-flaps" class="stat-value">0</span>
                     </div>
                 </div>
-
                 <div id="new-record" class="new-record hidden">
                     <div class="status status--success">🎉 New High Score!</div>
                 </div>
-
                 <div id="current-rank" class="current-rank">
                     <p>Your Rank: <span id="rank-value">#-</span></p>
                 </div>
-
                 <div class="button-group">
                     <button id="try-again-btn" class="btn btn--primary btn--lg">Play Again 🔄</button>
                     <button id="new-player-btn" class="btn btn--secondary btn--lg">New Player 👤</button>
@@ -117,10 +119,8 @@
                         <div class="commands-col">Flaps</div>
                         <div class="date-col">Date</div>
                     </div>
-                    <div id="leaderboard-list" class="leaderboard-list">
-                        </div>
+                    <div id="leaderboard-list" class="leaderboard-list"></div>
                 </div>
-                
                 <div class="button-group">
                     <button id="play-again-btn" class="btn btn--primary btn--lg">Play Again 🎮</button>
                     <button id="back-to-menu-btn" class="btn btn--outline">Back to Menu</button>
@@ -137,7 +137,11 @@
     <audio id="audio-gameover" src="./gameover.ogg"></audio>
     <audio id="audio-countdown" src="./countdown.ogg"></audio>
 
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script src="env.js"></script>
+
     <script src="app.js" defer></script>
 </body>
 </html>
-

@@ -1,3 +1,11 @@
+// The firebaseConfig object has been removed from this file.
+// It is now loaded from env.js before this script runs.
+
+// Initialize Firebase using the global firebaseConfig variable
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const scoresCollection = db.collection('highscores');
+
 const GAME_CONFIG = {
     birdStartX: 100,
     birdStartY: 300,
@@ -24,7 +32,36 @@ let gameState = {
     waitingForFirstInput: false
 };
 
-// Audio Manager
+// --- ADDED: reCAPTCHA callback functions ---
+/**
+ * Called by reCAPTCHA when the user successfully solves the challenge.
+ */
+window.onRecaptchaSuccess = function() {
+    console.log('reCAPTCHA verification successful.');
+    const playerNameInput = document.getElementById('player-name');
+    const startGameBtn = document.getElementById('start-game-btn');
+    
+    playerNameInput.disabled = false;
+    startGameBtn.disabled = false;
+    playerNameInput.placeholder = 'Your name here...';
+    playerNameInput.focus();
+};
+
+/**
+ * Called by reCAPTCHA when the verification token expires.
+ */
+window.onRecaptchaExpired = function() {
+    console.log('reCAPTCHA has expired. Please verify again.');
+    const playerNameInput = document.getElementById('player-name');
+    const startGameBtn = document.getElementById('start-game-btn');
+
+    playerNameInput.disabled = true;
+    startGameBtn.disabled = true;
+    playerNameInput.placeholder = 'Solve CAPTCHA to enter name...';
+};
+
+
+// Audio Manager (No changes)
 const AudioManager = {
     sounds: {},
     volumes: {
@@ -190,7 +227,7 @@ const AudioManager = {
     }
 };
 
-// --- MODIFIED: Text-to-Speech Engine with new Voice Selection ---
+// Text-to-Speech Engine (No changes)
 let selectedVoice = null;
 
 function initializeSpeechSynthesis() {
@@ -198,7 +235,6 @@ function initializeSpeechSynthesis() {
         const loadVoices = () => {
             const voices = window.speechSynthesis.getVoices();
             if (voices.length > 0) {
-                // Find a "bold" male voice, prioritizing US, then UK English
                 selectedVoice = voices.find(voice => voice.lang === 'en-US' && voice.name.toLowerCase().includes('male')) ||
                                 voices.find(voice => voice.lang === 'en-GB' && voice.name.toLowerCase().includes('male')) ||
                                 null;
@@ -284,7 +320,7 @@ function initializeGame() {
     birdImg.src = './flappy-bird.png'; 
     
     resetBird();
-    loadHighScores();
+    loadHighScores(); 
     showScreen('splash'); 
 }
 
@@ -339,9 +375,35 @@ function setupEventListeners() {
     });
 
     document.getElementById('start-game-btn').addEventListener('click', handleStartGame);
-    document.getElementById('view-leaderboard-btn').addEventListener('click', handleViewLeaderboard);
-    document.getElementById('player-name').addEventListener('input', (e) => gameState.playerName = e.target.value.trim());
-    document.getElementById('player-name').addEventListener('keypress', (e) => {
+    document.getElementById('view-leaderboard-btn').addEventListener('click', showLeaderboard);
+
+    const playerNameInput = document.getElementById('player-name');
+    const nameError = document.getElementById('player-name-error');
+    let errorTimeout = null;
+
+    playerNameInput.addEventListener('input', (e) => {
+        clearTimeout(errorTimeout); 
+
+        const inputElement = e.target;
+        const originalValue = inputElement.value;
+        const invalidCharsRegex = /[^a-zA-Z ]/g; 
+
+        if (invalidCharsRegex.test(originalValue)) {
+            nameError.classList.remove('hidden');
+            const sanitizedValue = originalValue.replace(invalidCharsRegex, '');
+            inputElement.value = sanitizedValue;
+            gameState.playerName = sanitizedValue;
+
+            errorTimeout = setTimeout(() => {
+                nameError.classList.add('hidden');
+            }, 2500);
+        } else {
+            nameError.classList.add('hidden');
+            gameState.playerName = originalValue;
+        }
+    });
+
+    playerNameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             handleStartGame();
@@ -349,7 +411,33 @@ function setupEventListeners() {
     });
 
     document.getElementById('try-again-btn').addEventListener('click', handleStartGame);
-    document.getElementById('new-player-btn').addEventListener('click', () => { gameState.playerName = ''; document.getElementById('player-name').value = ''; showScreen('welcome'); });
+    
+    // --- MODIFIED: New Player button logic ---
+    document.getElementById('new-player-btn').addEventListener('click', () => { 
+        // Reset player name state
+        gameState.playerName = ''; 
+        
+        // Get form elements
+        const playerNameInput = document.getElementById('player-name');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const nameError = document.getElementById('player-name-error');
+
+        // Reset and disable form
+        playerNameInput.value = '';
+        playerNameInput.disabled = true;
+        startGameBtn.disabled = true;
+        playerNameInput.placeholder = 'Solve CAPTCHA to enter name...';
+        nameError.classList.add('hidden');
+
+        // Reset the reCAPTCHA widget
+        // The 'grecaptcha' object is available globally from their script
+        if (typeof grecaptcha !== 'undefined') {
+            grecaptcha.reset();
+        }
+        
+        showScreen('welcome'); 
+    });
+
     document.getElementById('view-scores-btn').addEventListener('click', showLeaderboard);
     document.getElementById('play-again-btn').addEventListener('click', handleStartGame);
     document.getElementById('back-to-menu-btn').addEventListener('click', () => showScreen('welcome'));
@@ -374,30 +462,33 @@ function startFirstFlap() {
 }
 
 function handleStartGame() {
-    if (!gameState.playerName.trim()) {
-        const input = document.getElementById('player-name');
-        input.focus();
-        input.style.borderColor = 'var(--color-error)';
-        setTimeout(() => { input.style.borderColor = ''; }, 2000);
+    const playerNameInput = document.getElementById('player-name');
+    
+    // Do not start if the button is disabled
+    if (playerNameInput.disabled) return;
+
+    gameState.playerName = playerNameInput.value.trim(); 
+
+    if (!gameState.playerName) {
+        playerNameInput.focus();
+        playerNameInput.style.borderColor = 'var(--color-error)';
+        playerNameInput.value = '';
+        setTimeout(() => { playerNameInput.style.borderColor = ''; }, 2000);
         return;
     }
 
     AudioManager.stopMusic();
     const nameAudio = AudioManager.sounds.name;
-
     setTimeout(() => {
         nameAudio.currentTime = 0.0;
         nameAudio.play();
-
         const checkTimeInterval = setInterval(() => {
             if (nameAudio.currentTime >= 0.77) {
                 clearInterval(checkTimeInterval);
                 nameAudio.pause();
-
                 speakText(gameState.playerName, () => {
                     nameAudio.currentTime = 1.72;
                     nameAudio.play();
-                    
                     nameAudio.onended = () => {
                         nameAudio.onended = null;
                         startCountdown();
@@ -405,13 +496,7 @@ function handleStartGame() {
                 });
             }
         }, 10);
-
     }, 100);
-}
-
-
-function handleViewLeaderboard() {
-    showLeaderboard();
 }
 
 function updateFlapCounter() {
@@ -550,14 +635,14 @@ function updateScoreDisplay() {
     document.getElementById('current-score').textContent = gameState.score;
 }
 
-function endGame() {
+async function endGame() {
     if (!gameState.gameRunning) return;
     gameState.gameRunning = false;
     cancelAnimationFrame(animationFrame);
     
     AudioManager.stopAll();
     
-    addToLeaderboard(gameState.playerName, gameState.score, gameState.flapCount);
+    await addToLeaderboard(gameState.playerName, gameState.score, gameState.flapCount);
 
     AudioManager.play('lose', () => {
         showGameOverScreen(); 
@@ -567,23 +652,35 @@ function endGame() {
     });
 }
 
-function addToLeaderboard(name, score, flaps) {
-    gameState.highScores.push({ playerName: name, score, flaps, date: new Date().toLocaleDateString() });
-    gameState.highScores.sort((a, b) => b.score - a.score).splice(10);
-    saveHighScores();
+async function addToLeaderboard(name, score, flaps) {
+    try {
+        await scoresCollection.add({
+            playerName: name,
+            score: score,
+            flaps: flaps,
+            date: new Date().toLocaleDateString()
+        });
+        await loadHighScores();
+    } catch (error) {
+        console.error("Error adding document: ", error);
+    }
 }
 
-function showGameOverScreen() {
+async function showGameOverScreen() {
     document.getElementById('final-score-value').textContent = gameState.score;
     document.getElementById('final-flaps').textContent = gameState.flapCount;
+
     const isNewRecord = gameState.highScores.length > 0 && gameState.score > 0 && gameState.score >= gameState.highScores[0].score;
     document.getElementById('new-record').classList.toggle('hidden', !isNewRecord);
+
     const rank = gameState.highScores.findIndex(s => s.playerName === gameState.playerName && s.score === gameState.score) + 1;
     document.getElementById('rank-value').textContent = rank > 0 ? `#${rank}` : 'N/A';
+    
     showScreen('gameOver');
 }
 
-function showLeaderboard() {
+async function showLeaderboard() {
+    await loadHighScores();
     updateLeaderboardDisplay();
     showScreen('leaderboard');
 }
@@ -591,15 +688,38 @@ function showLeaderboard() {
 function updateLeaderboardDisplay() {
     const list = document.getElementById('leaderboard-list');
     if (!list) return;
-    list.innerHTML = gameState.highScores.length ? gameState.highScores.map((s, i) => `
+
+    const sanitizeName = (name) => {
+        if (!name || typeof name !== 'string') return 'Anonymous';
+        const escapeHTML = (str) => str.replace(/[&<>"']/g, function(match) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[match];
+        });
+        const escapedName = escapeHTML(name);
+        const cleanedName = escapedName.replace(/\s+/g, ' ').trim();
+        return cleanedName.length > 0 ? cleanedName : 'Anonymous';
+    };
+
+    list.innerHTML = gameState.highScores.length ? gameState.highScores.map((s, i) => {
+        const playerName = sanitizeName(s.playerName); 
+        const playerDate = s.date || 'N/A';
+
+        return `
         <div class="leaderboard-entry">
             <div class="rank-col">#${i + 1}</div>
-            <div class="name-col">${s.playerName}</div>
+            <div class="name-col" title="${playerName}">${playerName}</div>
             <div class="score-col">${s.score}</div>
             <div class="commands-col">${s.flaps}</div>
-            <div class="date-col">${s.date}</div>
-        </div>`).join('') : '<div class="empty-leaderboard">No scores yet! Be the first!</div>';
+            <div class="date-col">${playerDate}</div>
+        </div>`;
+    }).join('') : '<div class="empty-leaderboard">No scores yet! Be the first!</div>';
 }
+
 
 function togglePause() {
     if (!gameState.gameRunning) return;
@@ -638,20 +758,12 @@ function showScreen(screenName) {
     }
 }
 
-function saveHighScores() {
+async function loadHighScores() {
     try {
-        localStorage.setItem('flappyBirdScores', JSON.stringify(gameState.highScores));
+        const snapshot = await scoresCollection.orderBy("score", "desc").get();
+        gameState.highScores = snapshot.docs.map(doc => doc.data());
     } catch (e) {
-        console.error("Could not save scores to local storage.", e);
-    }
-}
-
-function loadHighScores() {
-    try {
-        const scores = localStorage.getItem('flappyBirdScores');
-        gameState.highScores = scores ? JSON.parse(scores) : [];
-    } catch (e) {
-        console.error("Could not load scores from local storage.", e);
+        console.error("Could not load scores from Firestore.", e);
         gameState.highScores = [];
     }
 }
